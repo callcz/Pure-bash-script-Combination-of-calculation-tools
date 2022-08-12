@@ -6,23 +6,32 @@ if [[ $1 == --help || $1 == -h || ! $1 ]]
 then
 	head -n 4 $0
 	echo "Usage: $0 [DIVIDEND] [DIVISOR] [SCALE] [OPSTIONS]
-	Default SCALE val is '10'
+	Default SCALE val is '12'
 Options:
 	%	Output Quotient.
 	/	Output Remainder.
-	--round,-r Round the result.
+	--uround,-ur Don't rounding after decimal point.
 	--help List this help.
 "
 	exit
 fi
 dividend=$1
 divisor=$2
+if [[ $1 -eq 0 ]] 2>/dev/null
+then
+	echo 0
+	exit
+elif [[ $2 -eq 0 ]] 2>/dev/null
+then
+	echo 'Divide by zero!' 1>&2
+	exit 3
+fi
 
 if [ $3 -ge 0 ] 2>/dev/null
 then
 	scale=$3
 else
-	scale=${scale:=10}
+	scale=${scale:=12}
 fi
 
 for i in $*
@@ -31,12 +40,22 @@ do
 	then
 		scale=0
 		check_per=1
+		check_2=1
 	else
-		scale=${scale:=10}
+		scale=${scale:=12}
 	fi
-	if [[ $i == -r || $i == --round ]]
+	if [[ $i == -ur || $i == --uround || $check_per == 1 ]]
 	then
-		round=1
+		round='null'
+		scale=$[scale-1]
+		scale_=$scale
+		if [[ $scale -le 0 ]] 1>&2
+		then
+			scale=0
+			check_per=1
+		fi
+	else
+		round='4/5'
 	fi
 done
 beichu=$dividend
@@ -152,7 +171,9 @@ do
 #					echo $check_
 					if [[ $check_ == '%' ]]
 					then
-						if [[ ${reg[0]} -ge ${reg[1]} ]]
+						check_1=`./addition_core.sh ${reg[0]} -${reg[1]}`
+#						if [[ ${reg[0]} -ge ${reg[1]} ]]
+						if [[ ${check_1:0:1} != '-' ]]
 						then
 							yu=`./addition_core.sh $1 -$(./multiplication_core.sh $zhi $2)`
 							echo $yu
@@ -162,6 +183,18 @@ do
 					fi
 					if [[ $check_ == '/' ]]
 					then
+						while [[ ${zhi:0:1} == 0 && ${#zhi} -ne 1 ]]
+						do
+							zhi=${zhi:1}
+						done
+						echo $zhi
+					fi
+					if [[ $check_ == -ur && $scale -eq 0 && $check_2 -ne 1 ]]
+					then
+						while [[ ${zhi:0:1} == 0 && ${#zhi} -ne 1 ]]
+						do
+							zhi=${zhi:1}
+						done
 						echo $zhi
 					fi
 				done
@@ -211,17 +244,18 @@ do
 		((j++))
 	done
 done
-echo *zhi=$zhi xiaoshuwei_=$xiaoshuwei_ scale=$scale minus=$minus 1>&2
+#echo *zhi=$zhi xiaoshuwei_=$xiaoshuwei_ scale=$scale minus=$minus 1>&2
+#echo scale=$scale round=$round 1>&2
 while [[ ${zhi:0:1} -eq 0 && ${#zhi} -ne 1 && ${zhi:0:2} != '0.' ]]
 do
 	zhi=${zhi:1}
 done
 #rounding
-if [[ $round == 1 ]]
+if [[ $round == '4/5' && $xiaoshuwei_ -gt $scale ]]
 then
-	echo "rounding function be under construction" 1>&2
+#	echo "rounding function be under construction" 1>&2
 	zhi_xiaoshu=${zhi#*.}
-	while [[ $zhi_xiaoshu -lt $xiaoshuwei_  && $zhi != ${zhi#*.} ]]
+	while [[ ${#zhi_xiaoshu} -lt $xiaoshuwei_  && $zhi != ${zhi#*.} ]]
 	do
 		zhi=${zhi}0
 		zhi_xiaoshu=${zhi#*.}
@@ -240,14 +274,24 @@ then
 	then
 		j=0.${j#0}
 	fi
-	echo $j
+#	echo j=$j
 	if [[ ${zhi_xiaoshu:0-1} -ge 5 ]]
 	then
+		round=up
 		zhi=${zhi:0:$[${#zhi}-1]}
 		zhi=`./addition_core.sh $zhi $j`
 	else
+		round=down
 		zhi=${zhi:0:$[${#zhi}-1]}
 	fi
+elif [[ $xiaoshuwei_ -gt $scale ]]
+then
+#	round=null
+	scale=$[scale_+1]
+fi
+if [[ ${zhi:0-1} == '.' ]]
+then
+	zhi=${zhi%.}
 fi
 if [[ $minus == 1 ]]
 then
@@ -255,5 +299,6 @@ then
 else
 	zhi_f=$zhi
 fi
+echo scale=$scale rounding=$round 1>&2
 echo $zhi_f
 exit
